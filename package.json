@@ -1,0 +1,31 @@
+{
+  "name": "gpx-viewer",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "devel": "vite build --mode development",
+    "build": "vite build --mode production",
+    "watch": "vite build --mode development --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "volta": {
+    "node": "22.11.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/eslint-parser": "^7.25.9",
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.15.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.12.0",
+    "prettier": "^3.4.1",
+    "rollup-plugin-esbuild": "^6.1.1",
+    "vite": "^6.0.1"
+  }
+}
