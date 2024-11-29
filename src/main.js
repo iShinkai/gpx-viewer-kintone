@@ -10,10 +10,6 @@
  * - - - - - - - - - - - - - - - - - - - -
  */
 
-/** MapLibre GL JS */
-import maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
-
 /** 共通関数 */
 import { drawMap, hideSideBar } from './functions'
 
