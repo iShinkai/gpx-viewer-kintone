@@ -1,4 +1,16 @@
-.map_container {
+/**
+ * ============================================================
+ *     gpx-viewer スタイルシート
+ * ============================================================
+ */
+
+/** 地図コンテナ（カスタマイズビュー） */
+.map_container-index {
+  height: calc(100vh - 282px);
+}
+
+/** 地図コンテナ（レコード詳細画面） */
+.map_container-detail {
   height: calc(100vh - 320px);
   margin-left: 32px;
   position: absolute;

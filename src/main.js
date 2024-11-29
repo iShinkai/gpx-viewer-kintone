@@ -70,7 +70,7 @@ kintone.events.on('app.record.detail.show', (event) => {
 
   // 地図マウントコンテナを取得し、クラスを付けておく
   const mapContainer = kintone.app.record.getSpaceElement(MAP_CONTAINER)
-  mapContainer.classList.add(MAP_CONTAINER)
+  mapContainer.classList.add(`${MAP_CONTAINER}-detail`)
 
   // 初期値で地図を描画する
   const map = drawMap({
@@ -83,6 +83,29 @@ kintone.events.on('app.record.detail.show', (event) => {
 
   // 返却
   return event
+})
+
+/**
+ * レコード一覧表示時処理
+ */
+kintone.events.on('app.record.index.show', (event) => {
+  console.log(event)
+
+  // カスタマイズビューでかつマウントターゲットがある場合
+  if (event.viewType === 'custom') {
+    // マウントターゲット要素
+    const mapContainer = document.getElementById(MAP_CONTAINER)
+    if (mapContainer) {
+      // クラスを付けておく
+      mapContainer.classList.add(`${MAP_CONTAINER}-index`)
+
+      // 初期値で地図を描画する
+      const map = drawMap({
+        container: MAP_CONTAINER,
+        params: MAP_PARAMS,
+      })
+    }
+  }
 })
 
 /**
