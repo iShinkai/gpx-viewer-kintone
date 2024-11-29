@@ -4,11 +4,14 @@ kintone の添付ファイルフィールドに追加した gpx ファイルを�
 
 ## インストールとセットアップ
 
-volta と pnpm を使用しています。
+volta と corepack、pnpm を使用しています。
 以下のコマンドでインストールを行います。
 
 ```bash
 volta install node@22.11.0
+volta install corepack
+corepack enable
+corepack enable pnpm
 pnpm
 ```
 
