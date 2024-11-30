@@ -13,9 +13,11 @@
 /** 共通関数 */
 import {
   drawMap,
-  hideSideBar,
-  drawPolylineByFile,
+  getCoordinatesAndTimestamps,
+  drawCoordinatePolyline,
   drawMarkersByPhotos,
+  createPointListElem,
+  pointDotOnMap,
 } from './functions'
 
 /** スタイル */
@@ -69,44 +71,15 @@ kintone.events.on('app.record.detail.show', async (event) => {
   console.log('レコード詳細表示時処理')
   console.log(event)
 
+  // コメント欄（サイドバー）を閉じておく
+  hideSideBar()
+
   // 地図マウントコンテナを取得し、クラスを付けておく
   const mapContainer = kintone.app.record.getSpaceElement(MAP_CONTAINER)
   mapContainer.classList.add(`${MAP_CONTAINER}-detail`)
 
-  // 初期値で地図を準備する
-  const map = drawMap({
-    container: mapContainer.id,
-    params: MAP_PARAMS,
-  })
-
-  // コメント欄（サイドバー）を閉じておく
-  hideSideBar()
-
-  // 添付ファイルフィールドから GPX ファイルを抽出する
-  const files = event.record['GPXファイル'].value
-  const gpxFile = files.find((f) => f.name.endsWith('.gpx'))
-
-  // GPX ファイルに基づく地点データをポリラインで地図に描画する
-  await drawPolylineByFile({ map, file: gpxFile })
-
-  // 写真テーブルから JGP 画像を取得する
-  // テーブルの個々の行には画像は1ファイルの想定
-  const photos = event.record['画像ファイルテーブル'].value.map((row) => {
-    if (
-      row.value['画像ファイル'].value &&
-      row.value['画像ファイル'].value.length &&
-      row.value['画像ファイル'].value[0].contentType === 'image/jpeg'
-    ) {
-      return {
-        file: row.value['画像ファイル'].value[0],
-        comment: row.value['画像コメント'].value || '',
-      }
-    }
-  })
-  console.log(photos)
-
-  // 写真をマーカーとして地図に配置する
-  await drawMarkersByPhotos({ map, files: photos })
+  // 地図コンテンツ部を構築する
+  await generateMapContent(event, mapContainer)
 
   // 返却
   return event
@@ -141,3 +114,68 @@ kintone.events.on('app.record.index.show', (event) => {
  * 関数
  * - - - - - - - - - - - - - - - - - - - -
  */
+
+/**
+ * コメント欄（サイドバー）を非表示にする
+ */
+const hideSideBar = () => {
+  if (location.href.includes('tab=')) {
+    location.href = location.href.replace(
+      /tab=comments|tab=history/,
+      'tab=none',
+    )
+  } else {
+    location.href = `${location.href}&tab=none`
+  }
+}
+
+/**
+ * 地図コンテンツ部を構築する
+ */
+const generateMapContent = async (event, mapContainer) => {
+  // 添付ファイルフィールドから GPX ファイルを抽出する
+  const files = event.record['GPXファイル'].value
+  const gpxFile = files.find((f) => f.name.endsWith('.gpx'))
+
+  // GPX ファイルから緯度経度高度情報配列と記録日時配列を得る
+  const { coordinates, timestamps } = await getCoordinatesAndTimestamps(gpxFile)
+
+  // 最初の地図センター
+  const firstCenter = coordinates[0]
+
+  // 初期値で地図を準備する
+  const map = await drawMap({
+    container: mapContainer.id,
+    params: { ...MAP_PARAMS, center: firstCenter },
+  })
+
+  // GPX ファイルに基づく地点データをポリラインで地図に描画する
+  await drawCoordinatePolyline({ map, coordinates, timestamps })
+
+  // 地図の開始位置にドットを置く
+  await pointDotOnMap({ map, coordinate: firstCenter })
+
+  // 写真テーブルから JGP 画像を取得する
+  // テーブルの個々の行には画像は1ファイルの想定
+  const photos = event.record['画像ファイルテーブル'].value.map((row) => {
+    if (
+      row.value['画像ファイル'].value &&
+      row.value['画像ファイル'].value.length &&
+      row.value['画像ファイル'].value[0].contentType === 'image/jpeg'
+    ) {
+      return {
+        file: row.value['画像ファイル'].value[0],
+        comment: row.value['画像コメント'].value || '',
+      }
+    }
+  })
+  console.log(photos)
+
+  // 写真をマーカーとして地図に配置する
+  await drawMarkersByPhotos({ map, files: photos })
+
+  // ポイントのリストを作成する
+  createPointListElem({ map, container: mapContainer, coordinates, timestamps })
+
+  return event
+}
