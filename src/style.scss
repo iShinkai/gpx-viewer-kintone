@@ -16,3 +16,20 @@
   position: absolute;
   width: calc(100vw - 640px);
 }
+
+/** ポップアップのボディ部 */
+.popup-body {
+  display: flex;
+  flex-direction: column;
+
+  /** ポップアップの画像 */
+  .popup-body-image {
+    margin-top: 12px;
+    width: 100%;
+  }
+
+  /** ポップアップのコメント */
+  .popup-body-desc {
+    margin-top: 4px;
+  }
+}

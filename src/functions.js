@@ -11,8 +11,11 @@
  */
 
 /** MapLibre GL JS */
-import maplibregl from 'maplibre-gl'
+import { Map, Marker, Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+
+/** EXIF.js */
+import EXIF from 'exif-js'
 
 /** kintone REST API Client */
 import { KintoneRestAPIClient } from '@kintone/rest-api-client'
@@ -27,7 +30,7 @@ import { KintoneRestAPIClient } from '@kintone/rest-api-client'
  * 指定の ID を持つ要素に指定のパラメータで地図を描画する
  */
 export const drawMap = ({ container, params }) => {
-  const map = new maplibregl.Map({
+  const map = new Map({
     container,
     ...params,
   })
@@ -49,6 +52,9 @@ export const hideSideBar = () => {
   }
 }
 
+/**
+ * GOX ファイルを受け取り地図上にポリラインを描画する
+ */
 export const drawPolylineByFile = async ({ map, file }) => {
   // GPX ファイルを読み込み地点データに変換する
   const doc = await readGpxFile(file)
@@ -180,4 +186,111 @@ export const getTrackPoints = (doc) => {
 
   // 返却
   return trackPoints
+}
+
+/**
+ * 写真画像を受け取り地図上にマーカーで描画する
+ * 写真画像はポップアップ内に表示する
+ */
+export const drawMarkersByPhotos = async ({ map, files }) => {
+  // 画像ファイルを読み取る
+  const images = []
+  for (const fileInfo of files) {
+    images.push({
+      ...(await readImageFile(fileInfo.file)),
+      comment: fileInfo.comment,
+    })
+  }
+
+  // 地図上にマーカーを配置する
+  images.forEach((image) => {
+    // ポップアップの内容物
+    const popupBody = document.createElement('div')
+    popupBody.classList.add('popup-body')
+    const img = document.createElement('img')
+    img.classList.add('popup-body-image')
+    img.src = image.blobUrl
+    const desc = document.createElement('span')
+    desc.classList.add('popup-body-desc')
+    desc.innerHTML = image.comment
+    popupBody.appendChild(img)
+    popupBody.appendChild(desc)
+
+    // ポップアップ
+    const popup = new Popup().setMaxWidth('400px').setDOMContent(popupBody)
+
+    // マーカー
+    const marker = new Marker()
+      .setLngLat([image.coordinate.lon, image.coordinate.lat])
+      .setPopup(popup)
+      .addTo(map)
+  })
+}
+
+/**
+ * 画像ファイルを読み込む
+ */
+const readImageFile = async (file) => {
+  // kintone REST API Client でファイルを取得する
+  console.log('kintone REST API Client でファイルを取得する')
+  const client = new KintoneRestAPIClient()
+  const arrayBuffer = await client.file.downloadFile({
+    fileKey: file.fileKey,
+  })
+  const blob = new Blob([arrayBuffer])
+
+  // Blob URL（表示用データURL）
+  const blobUrl = window.URL.createObjectURL(blob)
+
+  // File オブジェクト
+  const fileObj = new File([blob], file.name, { type: blob.type })
+
+  // Exif データを読み取る
+  const exif = await getExifData(fileObj)
+  console.log(file.name)
+  console.log(exif)
+
+  // Exifデータから緯度経度高度情報を得る
+  const coordinate = exifToLatLonAlt(exif)
+  console.log(coordinate)
+
+  // 各種情報をまとめて返却する
+  return {
+    ...file,
+    blobUrl,
+    coordinate,
+  }
+}
+
+/**
+ * File オブジェクトから Exif データを得る
+ */
+const getExifData = async (fileObj) => {
+  return new Promise((resolve, reject) => {
+    try {
+      EXIF.getData(fileObj, function () {
+        const allMetaData = EXIF.getAllTags(this)
+        resolve(allMetaData)
+      })
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+/**
+ * Exif データから緯度・経度・高度の情報を取得する
+ */
+const exifToLatLonAlt = (exif) => {
+  return {
+    lat:
+      exif.GPSLatitude[0] +
+      exif.GPSLatitude[1] / 60 +
+      exif.GPSLatitude[2] / 3600,
+    lon:
+      exif.GPSLongitude[0] +
+      exif.GPSLongitude[1] / 60 +
+      exif.GPSLongitude[2] / 3600,
+    alt: Number(exif.GPSAltitude),
+  }
 }
