@@ -11,7 +11,7 @@
  */
 
 /** 共通関数 */
-import { drawMap, hideSideBar } from './functions'
+import { drawMap, hideSideBar, drawPolylineByFile } from './functions'
 
 /** スタイル */
 import './style.scss'
@@ -60,7 +60,7 @@ const MAP_PARAMS = {
 /**
  * レコード詳細表示時処理
  */
-kintone.events.on('app.record.detail.show', (event) => {
+kintone.events.on('app.record.detail.show', async (event) => {
   console.log('レコード詳細表示時処理')
   console.log(event)
 
@@ -68,7 +68,7 @@ kintone.events.on('app.record.detail.show', (event) => {
   const mapContainer = kintone.app.record.getSpaceElement(MAP_CONTAINER)
   mapContainer.classList.add(`${MAP_CONTAINER}-detail`)
 
-  // 初期値で地図を描画する
+  // 初期値で地図を準備する
   const map = drawMap({
     container: mapContainer.id,
     params: MAP_PARAMS,
@@ -76,6 +76,13 @@ kintone.events.on('app.record.detail.show', (event) => {
 
   // コメント欄（サイドバー）を閉じておく
   hideSideBar()
+
+  // 添付ファイルフィールドから GPX ファイルを抽出する
+  const files = event.record['GPXファイル'].value
+  const gpxFile = files.find((f) => f.name.endsWith('.gpx'))
+
+  // GPX ファイルに基づく地点データをポリラインで地図に描画する
+  await drawPolylineByFile({ map, file: gpxFile })
 
   // 返却
   return event
@@ -85,6 +92,7 @@ kintone.events.on('app.record.detail.show', (event) => {
  * レコード一覧表示時処理
  */
 kintone.events.on('app.record.index.show', (event) => {
+  console.log('レコード一覧表示時処理')
   console.log(event)
 
   // カスタマイズビューでかつマウントターゲットがある場合
@@ -95,7 +103,7 @@ kintone.events.on('app.record.index.show', (event) => {
       // クラスを付けておく
       mapContainer.classList.add(`${MAP_CONTAINER}-index`)
 
-      // 初期値で地図を描画する
+      // 初期値で地図を準備する
       const map = drawMap({
         container: MAP_CONTAINER,
         params: MAP_PARAMS,
