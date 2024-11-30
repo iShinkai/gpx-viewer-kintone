@@ -17,6 +17,11 @@
   width: calc(100vw - 640px);
 }
 
+/** ポップアップ */
+.popup {
+  z-index: 2;
+}
+
 /** ポップアップのボディ部 */
 .popup-body {
   display: flex;
@@ -28,8 +33,67 @@
     width: 100%;
   }
 
-  /** ポップアップのコメント */
+  /** ポップアップの説明 */
   .popup-body-desc {
+    display: flex;
+    justify-content: space-between;
     margin-top: 4px;
+
+    /** 説明内の撮影日時 */
+    .popup-body-desc-timestamp {
+      color: gray;
+      font-style: italic;
+      margin-left: 12px;
+      white-space: nowrap;
+    }
   }
+}
+
+/** ポイントリストのボックス */
+.point-list-box {
+  background-color: white;
+  border: 1px solid black;
+  display: grid;
+  grid-template-rows: 1fr 24px;
+  padding: 8px;
+  position: absolute;
+  right: 24px;
+  top: 24px;
+}
+
+/** ポイントリストのテーブル */
+.point-list-table {
+  max-height: 300px;
+  overflow-y: auto;
+
+  table { 
+    font-size: 0.675rem;
+    width: 100%;
+  }
+  thead th {
+    height: unset;
+    padding: 0 8px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  tbody tr {
+    &:hover, &.selected-row {
+      color: blue;
+      background-color: lightcyan;
+      cursor: pointer;
+    }
+    td {
+      padding: 0 8px;
+      text-align: right;
+    }
+  }
+}
+
+/** ポイントリストのステップ数 */
+.point-list-steps {
+  height: 24px;
+  line-height: 24px;
+  text-align: right;
+  padding: 0 8px;
 }
