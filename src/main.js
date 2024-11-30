@@ -11,7 +11,12 @@
  */
 
 /** 共通関数 */
-import { drawMap, hideSideBar, drawPolylineByFile } from './functions'
+import {
+  drawMap,
+  hideSideBar,
+  drawPolylineByFile,
+  drawMarkersByPhotos,
+} from './functions'
 
 /** スタイル */
 import './style.scss'
@@ -83,6 +88,25 @@ kintone.events.on('app.record.detail.show', async (event) => {
 
   // GPX ファイルに基づく地点データをポリラインで地図に描画する
   await drawPolylineByFile({ map, file: gpxFile })
+
+  // 写真テーブルから JGP 画像を取得する
+  // テーブルの個々の行には画像は1ファイルの想定
+  const photos = event.record['画像ファイルテーブル'].value.map((row) => {
+    if (
+      row.value['画像ファイル'].value &&
+      row.value['画像ファイル'].value.length &&
+      row.value['画像ファイル'].value[0].contentType === 'image/jpeg'
+    ) {
+      return {
+        file: row.value['画像ファイル'].value[0],
+        comment: row.value['画像コメント'].value || '',
+      }
+    }
+  })
+  console.log(photos)
+
+  // 写真をマーカーとして地図に配置する
+  await drawMarkersByPhotos({ map, files: photos })
 
   // 返却
   return event
