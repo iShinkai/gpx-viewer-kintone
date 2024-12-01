@@ -21,13 +21,22 @@ import EXIF from 'exif-js'
 import { KintoneRestAPIClient } from '@kintone/rest-api-client'
 
 /** kintone UI Components */
-import { ReadOnlyTable } from 'kintone-ui-component'
+import { Dropdown, ReadOnlyTable } from 'kintone-ui-component'
 
 /**
  * - - - - - - - - - - - - - - - - - - - -
  * 変数
  * - - - - - - - - - - - - - - - - - - - -
  */
+
+/** 地点リストテーブル（KUC ReadOnlyTable） */
+let pointListTable = null
+
+/** 座標配列 */
+const coordinates = []
+
+/** 記録日時配列 */
+const timestamps = []
 
 /** アニメーションの現在の再生位置 */
 let playhead = 0
@@ -43,6 +52,36 @@ let mouseIid = null
  * 関数
  * - - - - - - - - - - - - - - - - - - - -
  */
+
+/**
+ * 指定のクエリに基づきアプリのレコードを一括取得して返却する
+ */
+export const getAppRecordsByQuery = async (query) => {
+  console.log('指定のクエリに基づきアプリのレコードを一括取得して返却する')
+  console.log(query)
+
+  // kintone REST API Client
+  const client = new KintoneRestAPIClient()
+
+  // 取得パラメータを準備する
+  const params = {
+    app: kintone.app.getId(),
+  }
+  if (query.includes('order by ')) {
+    params.condition = query.substring(0, query.indexOf('order by '))
+    params.orderBy = query.substring(query.indexOf('order by ') + 9)
+  } else {
+    params.condition = query
+  }
+  console.log(params)
+
+  // 指定のパラメータでレコードを一括取得する
+  const records = await client.record.getAllRecords(params)
+  console.log(records)
+
+  // 返却
+  return records
+}
 
 /**
  * 指定の ID を持つ要素に指定のパラメータで地図を描画する
@@ -177,9 +216,9 @@ export const getCoordinatesAndTimestamps = async (file) => {
   const doc = await readGpxFile(file)
   const trackPoints = getTrackPoints(doc)
 
-  // 地点データと記録日時データの配列を準備する
-  const coordinates = []
-  const timestamps = []
+  // 地点データと記録日時データの配列を初期化する
+  coordinates.length = 0
+  timestamps.length = 0
 
   // 地点データでループし配列に積み込むする
   trackPoints.forEach((trkpt, idx) => {
@@ -631,17 +670,6 @@ const createPointListElem = ({ map, container, coordinates, timestamps }) => {
 
   box.appendChild(boxHeader)
 
-  // 表示するデータを正規化する
-  const data = coordinates.map((coordinate, index) => {
-    return {
-      index: index + 1,
-      lon: coordinate[0].toFixed(6),
-      lat: coordinate[1].toFixed(6),
-      alt: coordinate[2].toFixed(1),
-      timestamp: dateToString(timestamps[index], 'time'),
-    }
-  })
-
   // テーブルのコンテナ
   const tableContainer = document.createElement('div')
   tableContainer.classList.add('point-list-table-container', 'is-closed')
@@ -649,7 +677,7 @@ const createPointListElem = ({ map, container, coordinates, timestamps }) => {
   tableContainerInner.classList.add('point-list-table-container-inner')
 
   // テーブルを作成する（KUC ReadOnlyTable）
-  const table = new ReadOnlyTable({
+  pointListTable = new ReadOnlyTable({
     columns: [
       { title: 'STEP', field: 'index' },
       { title: '緯度', field: 'lat' },
@@ -657,19 +685,21 @@ const createPointListElem = ({ map, container, coordinates, timestamps }) => {
       { title: '標高', field: 'alt' },
       { title: '日時', field: 'timestamp' },
     ],
-    data,
     className: 'point-list-table',
     pagination: false,
   })
-  tableContainerInner.appendChild(table)
+  tableContainerInner.appendChild(pointListTable)
   tableContainer.appendChild(tableContainerInner)
   box.appendChild(tableContainer)
 
   // コンテナに追加する
   container.appendChild(box)
 
+  // テーブルにデータをセットする
+  setPointListTable({ coordinates, timestamps })
+
   // テーブルにイベントを設置する
-  table.addEventListener('click', (event) => {
+  pointListTable.addEventListener('click', (event) => {
     // クリックされた行を特定する
     const row = event.target.closest('tr')
     if (row && row.parentNode.tagName === 'TBODY') {
@@ -686,6 +716,34 @@ const createPointListElem = ({ map, container, coordinates, timestamps }) => {
   setTimeout(() => {
     movePlayheadTo({ map, coordinates, timestamps, index: 0 })
   }, 2000)
+}
+
+/**
+ * 受け取った座標データ配列と日時データ配列でリストを更新する
+ */
+const setPointListTable = ({ coordinates, timestamps }) => {
+  // 表示するデータを正規化する
+  const data = coordinates.map((coordinate, index) => {
+    return {
+      index: index + 1,
+      lon: (coordinate[0] ? coordinate[0] : 0).toFixed(6),
+      lat: (coordinate[1] ? coordinate[1] : 0).toFixed(6),
+      alt: (coordinate[2] ? coordinate[2] : 0).toFixed(1),
+      timestamp: dateToString(timestamps[index], 'time'),
+    }
+  })
+
+  // テーブルにデータをセットする
+  pointListTable.data = data
+
+  // ステップ数を更新する
+  const stepElem = document.querySelector('.point-list-steps')
+  stepElem.innerHTML = `total: ${coordinates.length} steps`
+
+  // 日時の初期値を更新する
+  document.querySelector('.current-position-box').innerHTML = dateToString(
+    timestamps[0],
+  )
 }
 
 /**
@@ -798,7 +856,29 @@ export const pointDotOnMap = async ({ map, coordinate, size = 128 }) => {
   })
 }
 
-const dateToString = (date, format = 'datetime') => {
+/**
+ * ドロップダウンリストを作成して返却する
+ */
+export const createDropdown = ({
+  data,
+  container,
+  className = '',
+  selectedIndex = 0,
+}) => {
+  const dropdown = new Dropdown({
+    items: data,
+    className,
+    selectedIndex,
+  })
+  container.appendChild(dropdown)
+
+  return dropdown
+}
+
+/**
+ * 日付を文字列にフォーマットする
+ */
+export const dateToString = (date, format = 'datetime') => {
   if (format === 'date') {
     return `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`
   } else if (format === 'time') {

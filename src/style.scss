@@ -4,6 +4,11 @@
  * ============================================================
  */
 
+/** 親コンテナ（カスタマイズビュー） */
+.gpx_viewer {
+  position: relative;
+}
+
 /** 地図コンテナ（カスタマイズビュー） */
 .map_container-index {
   height: calc(100vh - 282px);
@@ -59,6 +64,7 @@
   right: 24px;
   row-gap: 16px;
   top: 24px;
+  z-index: 1;
 }
 
 /** アニメーションコントローラー */
@@ -71,7 +77,7 @@
   .current-position-box {
     background-color: white;
     border: 1px solid black;
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     height: 36px;
     line-height: 36px;
     position: relative;
@@ -123,8 +129,9 @@
         display: none;
 
         .control-button-label {
-          letter-spacing: -0.1rem;
-          text-indent: -0.1rem;
+          letter-spacing: -0.25rem;
+          margin-top: -3px;
+          text-indent: -0.25rem;
           transform: scaleX(6);
         }
       }
@@ -179,6 +186,7 @@
   cursor: pointer;
   font-size: 20px;
   height: 20px;
+  line-height: 20px;
   position: absolute;
   right: 8px;
   top: 2px;
@@ -224,6 +232,7 @@
         td {
           padding: 0 8px;
           text-align: right;
+          --kuc-readonly-table-header-3-width: 60px
         }
       }
     }
@@ -233,4 +242,13 @@
     opacity: 0;
     grid-template-rows: 0fr;
   }
+}
+
+/** レコード選択ドロップダウンリスト */
+.record-select {
+  left: 36px;
+  position: absolute;
+  top: 24px;
+  width: 600px;
+  z-index: 1;
 }
