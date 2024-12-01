@@ -25,6 +25,21 @@ import { ReadOnlyTable } from 'kintone-ui-component'
 
 /**
  * - - - - - - - - - - - - - - - - - - - -
+ * 変数
+ * - - - - - - - - - - - - - - - - - - - -
+ */
+
+/** アニメーションの現在の再生位置 */
+let playhead = 0
+
+/** アニメーション再生中フラグ */
+let isPlaying = false
+
+/** マウスボタン押下中 iid */
+let mouseIid = null
+
+/**
+ * - - - - - - - - - - - - - - - - - - - -
  * 関数
  * - - - - - - - - - - - - - - - - - - - -
  */
@@ -230,9 +245,7 @@ export const drawMarkersByPhotos = async ({ map, files }) => {
     // ---- 撮影日時
     const timestamp = document.createElement('div')
     timestamp.classList.add('popup-body-desc-timestamp')
-    timestamp.innerHTML = image.timestamp
-      ? image.timestamp.toLocaleString()
-      : ''
+    timestamp.innerHTML = image.timestamp ? dateToString(image.timestamp) : ''
     desc.appendChild(timestamp)
 
     popupBody.appendChild(desc)
@@ -337,17 +350,286 @@ const exifToTimestamp = (exif) => {
 }
 
 /**
- * 受け取った座標データ配列と日時データ配列でリストを作成する
+ * コントロールボックスを作成する
  */
-export const createPointListElem = ({
+export const createControlBox = ({
   map,
   container,
+  buttons,
+  coordinates,
+  timestamps,
+}) => {
+  // コントローラーを格納するボックス
+  const controlBox = document.createElement('div')
+  controlBox.classList.add('control-box')
+  container.appendChild(controlBox)
+
+  // アニメーションコントローラーを作成する
+  createAnimationControlBox({
+    map,
+    container: controlBox,
+    buttons,
+    coordinates,
+    timestamps,
+  })
+
+  // ポイントのリストを作成する
+  createPointListElem({
+    map,
+    container: controlBox,
+    coordinates,
+    timestamps,
+  })
+}
+
+/**
+ * 受け取った座標データ配列と日時データ配列でアニメーションコントローラーを作成する
+ */
+const createAnimationControlBox = ({
+  map,
+  container,
+  buttons,
   coordinates,
   timestamps,
 }) => {
   // ボックス全体
   const box = document.createElement('div')
+  box.classList.add('animation-control-box')
+
+  // 現在位置ボックス
+  const currentPosBox = document.createElement('div')
+  currentPosBox.classList.add('current-position-box')
+  currentPosBox.innerHTML = dateToString(timestamps[0])
+  box.appendChild(currentPosBox)
+
+  // 再生位置コントロールボックス
+  const posControlBox = document.createElement('div')
+  posControlBox.classList.add('position-control-box')
+
+  // コントロールボタン
+  buttons.forEach((b) => {
+    const button = document.createElement('div')
+    button.classList.add('control-button', `button-${b.id}`)
+    const buttonLabel = document.createElement('div')
+    buttonLabel.classList.add('control-button-label')
+    buttonLabel.innerHTML = b.label
+    button.appendChild(buttonLabel)
+    posControlBox.appendChild(button)
+  })
+  box.appendChild(posControlBox)
+
+  // コンテナに追加する
+  container.appendChild(box)
+
+  // 各ボタンにイベントを設置する
+
+  // -- 先頭に戻るボタン
+  document.querySelector('.button-first').addEventListener('click', () => {
+    movePlayheadTo({ map, coordinates, timestamps, index: 0 })
+  })
+
+  // -- 1ステップ戻るボタン
+  document.querySelector('.button-prev').addEventListener('mousedown', () => {
+    if (!mouseIid) {
+      mouseIid = setInterval(() => {
+        movePlayheadTo({ map, coordinates, timestamps, index: playhead - 1 })
+      }, 20)
+    }
+  })
+  document
+    .querySelector('.button-prev')
+    .addEventListener('mouseup', stopMouseInterval)
+  document
+    .querySelector('.button-prev')
+    .addEventListener('mouseleave', stopMouseInterval)
+
+  // -- 再生開始ボタン
+  document.querySelector('.button-play').addEventListener('click', () => {
+    startPlay({
+      map,
+      coordinates,
+      timestamps,
+      index: playhead,
+    })
+  })
+
+  // -- 再生停止ボタン
+  document.querySelector('.button-stop').addEventListener('click', () => {
+    stopPlay({
+      map,
+      coordinates,
+      timestamps,
+      index: playhead,
+    })
+  })
+
+  // -- 1ステップ進むボタン
+  document.querySelector('.button-next').addEventListener('mousedown', () => {
+    if (!mouseIid) {
+      mouseIid = setInterval(() => {
+        movePlayheadTo({ map, coordinates, timestamps, index: playhead + 1 })
+      }, 20)
+    }
+  })
+  document
+    .querySelector('.button-next')
+    .addEventListener('mouseup', stopMouseInterval)
+  document
+    .querySelector('.button-next')
+    .addEventListener('mouseleave', stopMouseInterval)
+
+  // -- 末尾に進むボタン
+  document.querySelector('.button-last').addEventListener('click', () => {
+    movePlayheadTo({
+      map,
+      coordinates,
+      timestamps,
+      index: timestamps.length - 1,
+    })
+  })
+}
+
+/**
+ * 再生位置を指定ポジションに動かす
+ */
+const movePlayheadTo = ({ map, coordinates, timestamps, index }) => {
+  // 再生位置の補正
+  if (index < 0) index = 0
+  if (index >= timestamps.length) index = timestamps.length - 1
+  playhead = index
+
+  // 再生位置ボックスに反映させる
+  document.querySelector('.current-position-box').innerHTML = dateToString(
+    timestamps[playhead],
+  )
+
+  // テーブルにクラスを反映させる
+  const pointListTableBody = document.querySelector('.point-list-table tbody')
+  const curRow = pointListTableBody.querySelector('tr.selected-row')
+  if (curRow) curRow.classList.remove('selected-row')
+  const selRow = pointListTableBody.querySelector(
+    `tr:nth-of-type(${playhead + 1})`,
+  )
+  if (selRow) selRow.classList.add('selected-row')
+
+  // テーブルの指定行をスクロール表示する
+  selRow.scrollIntoView({
+    behavior: 'auto',
+    block: 'center',
+  })
+
+  // 地図に反映させる
+  moveToCoordinate(map, coordinates[playhead])
+}
+
+/**
+ * 繰り返し処理を停止する
+ */
+const stopMouseInterval = () => {
+  clearInterval(mouseIid)
+  mouseIid = null
+}
+
+/**
+ * アニメーションの再生を開始する
+ */
+const startPlay = async ({ map, coordinates, timestamps, index }) => {
+  isPlaying = true
+
+  // 現在の再生位置が末尾なら最初からスタートする
+  if (index >= coordinates.length - 1) index = 0
+
+  // コントロールボックスのクラスを付け替える
+  document.querySelector('.position-control-box').classList.toggle('is-playing')
+
+  // ラインを作成する
+  const line = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: coordinates.slice(0, index + 1),
+        },
+        properties: {
+          timestamps,
+        },
+      },
+    ],
+  }
+
+  // 現在位置からアニメーションを開始する
+  animateLine({ map, line, coordinates, timestamps, index })
+}
+
+/**
+ * アニメーションの再生を停止する
+ */
+const stopPlay = () => {
+  isPlaying = false
+
+  // コントロールボックスのクラスを付け替える
+  document.querySelector('.position-control-box').classList.toggle('is-playing')
+}
+
+/**
+ * ポリラインをアニメーションで描画する
+ */
+const animateLine = ({ map, line, coordinates, timestamps, index }) => {
+  // 再生停止されたら戻る
+  if (!isPlaying) return
+
+  // 新しい座標を追加する
+  line.features[0].geometry.coordinates.push(coordinates[index])
+
+  // センターをセットする
+  movePlayheadTo({ map, coordinates, timestamps, index })
+
+  // GeoJSONソースを更新する
+  map.getSource('line').setData(line)
+
+  // アニメーションが続く限り再帰的に呼び出す
+  if (++index < coordinates.length) {
+    requestAnimationFrame(() => {
+      animateLine({ map, line, coordinates, timestamps, index })
+    })
+  } else {
+    // 末尾に到達したら再生停止する
+    console.log('末尾に到達したら再生停止する')
+    stopPlay()
+  }
+}
+
+/**
+ * 受け取った座標データ配列と日時データ配列でリストを作成する
+ */
+const createPointListElem = ({ map, container, coordinates, timestamps }) => {
+  // ボックス全体
+  const box = document.createElement('div')
   box.classList.add('point-list-box')
+
+  // ボックスのヘッダ部
+  const boxHeader = document.createElement('div')
+  boxHeader.classList.add('point-list-header')
+
+  // ステップ数
+  const stepElem = document.createElement('div')
+  stepElem.classList.add('point-list-steps')
+  stepElem.innerHTML = `total: ${coordinates.length} steps`
+  boxHeader.appendChild(stepElem)
+
+  // 最小化ボタン
+  const minButton = document.createElement('div')
+  minButton.classList.add('point-list-min-button', 'is-closed')
+  minButton.innerHTML = '🔼'
+  minButton.title = 'リストを閉じる'
+  minButton.addEventListener('click', (event) => {
+    openClosePointList(event.target)
+  })
+  boxHeader.appendChild(minButton)
+
+  box.appendChild(boxHeader)
 
   // 表示するデータを正規化する
   const data = coordinates.map((coordinate, index) => {
@@ -356,14 +638,20 @@ export const createPointListElem = ({
       lon: coordinate[0].toFixed(6),
       lat: coordinate[1].toFixed(6),
       alt: coordinate[2].toFixed(1),
-      timestamp: timestamps[index].toLocaleTimeString(),
+      timestamp: dateToString(timestamps[index], 'time'),
     }
   })
+
+  // テーブルのコンテナ
+  const tableContainer = document.createElement('div')
+  tableContainer.classList.add('point-list-table-container', 'is-closed')
+  const tableContainerInner = document.createElement('div')
+  tableContainerInner.classList.add('point-list-table-container-inner')
 
   // テーブルを作成する（KUC ReadOnlyTable）
   const table = new ReadOnlyTable({
     columns: [
-      { title: '', field: 'index' },
+      { title: 'STEP', field: 'index' },
       { title: '緯度', field: 'lat' },
       { title: '経度', field: 'lon' },
       { title: '標高', field: 'alt' },
@@ -373,13 +661,9 @@ export const createPointListElem = ({
     className: 'point-list-table',
     pagination: false,
   })
-  box.appendChild(table)
-
-  // ステップ数
-  const stepElem = document.createElement('div')
-  stepElem.classList.add('point-list-steps')
-  stepElem.innerHTML = `total: ${coordinates.length} steps`
-  box.appendChild(stepElem)
+  tableContainerInner.appendChild(table)
+  tableContainer.appendChild(tableContainerInner)
+  box.appendChild(tableContainer)
 
   // コンテナに追加する
   container.appendChild(box)
@@ -394,22 +678,35 @@ export const createPointListElem = ({
       )
       row.classList.add('selected-row')
       const rowIndex = Array.from(row.parentNode.children).indexOf(row)
-      moveToCoordinate(map, coordinates[rowIndex])
+      movePlayheadTo({ map, coordinates, timestamps, index: rowIndex })
     }
   })
+
+  // 1行目を表示しておく
+  setTimeout(() => {
+    movePlayheadTo({ map, coordinates, timestamps, index: 0 })
+  }, 2000)
+}
+
+/**
+ * ボタンクリックで地点リストを開閉する
+ */
+const openClosePointList = (target) => {
+  target.classList.toggle('is-closed')
+  const tableContainer = document.querySelector('.point-list-table-container')
+  tableContainer.classList.toggle('is-closed')
 }
 
 /**
  * 指定の緯度経度（[経度, 緯度]）に地図のセンターを移動する
  */
 const moveToCoordinate = (map, coordinate) => {
-  console.log('指定の緯度経度（[経度, 緯度]）に地図のセンターを移動する')
-  console.log(coordinate)
+  // console.log('指定の緯度経度（[経度, 緯度]）に地図のセンターを移動する')
+  // console.log(coordinate)
   map.setCenter(coordinate)
-  console.log(map)
+  // console.log(map)
   const point = map.getSource('points')
   if (point) {
-    console.log(point)
     point.setData({
       type: 'Point',
       coordinates: coordinate,
@@ -499,6 +796,15 @@ export const pointDotOnMap = async ({ map, coordinate, size = 128 }) => {
 
     resolve()
   })
+}
+
+const dateToString = (date, format = 'datetime') => {
+  if (format === 'date') {
+    return `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`
+  } else if (format === 'time') {
+    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`
+  }
+  return `${dateToString(date, 'date')} ${dateToString(date, 'time')}`
 }
 
 /**

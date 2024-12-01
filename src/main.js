@@ -16,7 +16,7 @@ import {
   getCoordinatesAndTimestamps,
   drawCoordinatePolyline,
   drawMarkersByPhotos,
-  createPointListElem,
+  createControlBox,
   pointDotOnMap,
 } from './functions'
 
@@ -58,6 +58,16 @@ const MAP_PARAMS = {
   zoom: 10,
 }
 
+/** 表示位置コントロールボタンの配列 */
+const POS_CONTROL_BUTTONS = [
+  { id: 'first', label: '|◀' },
+  { id: 'prev', label: '◀◀' },
+  { id: 'play', label: '▶' },
+  { id: 'stop', label: '||' },
+  { id: 'next', label: '▶▶' },
+  { id: 'last', label: '▶|' },
+]
+
 /**
  * - - - - - - - - - - - - - - - - - - - -
  * kintone イベントハンドラ
@@ -73,6 +83,9 @@ kintone.events.on('app.record.detail.show', async (event) => {
 
   // コメント欄（サイドバー）を閉じておく
   hideSideBar()
+
+  // （kintone標準）メニューヘッダのスタイルを修正する
+  document.querySelector('.gaia-argoui-app-show-menu').style.zIndex = 2
 
   // 地図マウントコンテナを取得し、クラスを付けておく
   const mapContainer = kintone.app.record.getSpaceElement(MAP_CONTAINER)
@@ -174,8 +187,14 @@ const generateMapContent = async (event, mapContainer) => {
   // 写真をマーカーとして地図に配置する
   await drawMarkersByPhotos({ map, files: photos })
 
-  // ポイントのリストを作成する
-  createPointListElem({ map, container: mapContainer, coordinates, timestamps })
+  // コントロールボックスを作成する
+  createControlBox({
+    map,
+    container: mapContainer,
+    buttons: POS_CONTROL_BUTTONS,
+    coordinates,
+    timestamps,
+  })
 
   return event
 }
