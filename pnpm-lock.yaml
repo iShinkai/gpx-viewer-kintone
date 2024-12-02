@@ -20,6 +20,9 @@ importers:
       maplibre-gl:
         specifier: ^4.7.1
         version: 4.7.1
+      maplibre-gl-gsi-terrain:
+        specifier: ^2.0.1
+        version: 2.0.1
     devDependencies:
       '@babel/core':
         specifier: ^7.26.0
@@ -1045,6 +1048,9 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  maplibre-gl-gsi-terrain@2.0.1:
+    resolution: {integrity: sha512-W8TCHqAfNKqlT3F6nXDWE2zBXQ0FESpgrrojQytzzXfUqHDi8s33mzzkkcsjB8Nlt0JAj9qBssiez6lJCgs+BQ==}
 
   maplibre-gl@4.7.1:
     resolution: {integrity: sha512-lgL7XpIwsgICiL82ITplfS7IGwrB1OJIw/pCvprDp2dhmSSEBgmPzYRvwYYYvJGJD7fxUv1Tvpih4nZ6VrLuaA==}
@@ -2250,6 +2256,10 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  maplibre-gl-gsi-terrain@2.0.1:
+    dependencies:
+      maplibre-gl: 4.7.1
 
   maplibre-gl@4.7.1:
     dependencies:

@@ -11,8 +11,9 @@
  */
 
 /** MapLibre GL JS */
-import { Map, Marker, Popup } from 'maplibre-gl'
+import maplibreGl, { Map, Marker, Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { useGsiTerrainSource } from 'maplibre-gl-gsi-terrain'
 
 /** EXIF.js */
 import EXIF from 'exif-js'
@@ -22,6 +23,22 @@ import { KintoneRestAPIClient } from '@kintone/rest-api-client'
 
 /** kintone UI Components */
 import { Dropdown, ReadOnlyTable } from 'kintone-ui-component'
+
+/**
+ * - - - - - - - - - - - - - - - - - - - -
+ * 定数
+ * - - - - - - - - - - - - - - - - - - - -
+ */
+
+/** 表示位置コントロールボタンの配列 */
+const POS_CONTROL_BUTTONS = [
+  { id: 'first', label: '|◀' },
+  { id: 'prev', label: '◀◀' },
+  { id: 'play', label: '▶' },
+  { id: 'stop', label: '||' },
+  { id: 'next', label: '▶▶' },
+  { id: 'last', label: '▶|' },
+]
 
 /**
  * - - - - - - - - - - - - - - - - - - - -
@@ -38,6 +55,9 @@ const coordinates = []
 /** 記録日時配列 */
 const timestamps = []
 
+/** 写真情報配列 */
+const photos = []
+
 /** アニメーションの現在の再生位置 */
 let playhead = 0
 
@@ -46,6 +66,82 @@ let isPlaying = false
 
 /** マウスボタン押下中 iid */
 let mouseIid = null
+
+/** 3D表示フラグ */
+let is3dView = false
+
+/** ノースアップ表示フラグ */
+let isNorthUpView = false
+
+/** 地図パラメータ初期値 */
+const defMapParams = {
+  style: {
+    version: 8,
+    sources: {
+      osm: {
+        type: 'raster',
+        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      },
+    },
+    layers: [
+      {
+        id: 'osm-layer',
+        type: 'raster',
+        source: 'osm',
+      },
+    ],
+    sky: {},
+  },
+  center: [139.6917, 35.6895],
+  zoom: 10,
+}
+
+/** 標高タイル */
+const gsiTerrainSource = useGsiTerrainSource(maplibreGl.addProtocol)
+const gsiTerrainParams = {
+  style: {
+    version: 8,
+    sources: {
+      seamlessphoto: {
+        type: 'raster',
+        tiles: [
+          'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',
+        ],
+        maxzoom: 18,
+        tileSize: 256,
+        attribution:
+          '<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>',
+      },
+      terrain: gsiTerrainSource,
+    },
+    layers: [
+      {
+        id: 'seamlessphoto',
+        type: 'raster',
+        source: 'seamlessphoto',
+      },
+    ],
+    terrain: {
+      source: 'terrain',
+      exaggeration: 1.2,
+    },
+    sky: {
+      'sky-color': '#2481f9',
+      'sky-horizon-blend': 0.5,
+      'horizon-color': '#8fcbf0',
+      'horizon-fog-blend': 0.1,
+      'fog-color': '#ffffff',
+      'fog-ground-blend': 0.5,
+    },
+  },
+  center: [139.6917, 35.6895],
+  zoom: 13,
+  pitch: 70,
+  maxPitch: 85,
+}
 
 /**
  * - - - - - - - - - - - - - - - - - - - -
@@ -87,9 +183,27 @@ export const getAppRecordsByQuery = async (query) => {
  * 指定の ID を持つ要素に指定のパラメータで地図を描画する
  */
 export const drawMap = async ({ container, params }) => {
+  // 表示用パラメータ
+  const mapParams = (() => {
+    if (is3dView) {
+      return { ...gsiTerrainParams, ...params }
+    }
+    return { ...defMapParams, ...params }
+  })()
+  console.log('表示用パラメータ')
+  console.log(mapParams)
+
+  // 一旦コンテナを空にする
+  const containerElem = document.getElementById(container)
+  while (true) {
+    if (!containerElem.children.length) break
+    containerElem.removeChild(containerElem.firstChild)
+  }
+
+  // 描画する
   const map = new Map({
     container,
-    ...params,
+    ...mapParams,
   })
   await sleep(1000)
   return map
@@ -248,6 +362,11 @@ export const getCoordinatesAndTimestamps = async (file) => {
  * 写真画像はポップアップ内に表示する
  */
 export const drawMarkersByPhotos = async ({ map, files }) => {
+  console.log('写真画像を受け取り地図上にマーカーで描画する')
+  photos.length = 0
+  photos.push(...files)
+  console.log(photos)
+
   // 画像ファイルを読み取る
   const images = []
   for (const fileInfo of files) {
@@ -394,10 +513,16 @@ const exifToTimestamp = (exif) => {
 export const createControlBox = ({
   map,
   container,
-  buttons,
+  mapContainer,
   coordinates,
   timestamps,
 }) => {
+  // 既存のボックスを削除する
+  const curBox = document.querySelector('.control-box')
+  if (curBox) {
+    curBox.parentElement.removeChild(curBox)
+  }
+
   // コントローラーを格納するボックス
   const controlBox = document.createElement('div')
   controlBox.classList.add('control-box')
@@ -407,7 +532,8 @@ export const createControlBox = ({
   createAnimationControlBox({
     map,
     container: controlBox,
-    buttons,
+    mapContainer,
+    buttons: POS_CONTROL_BUTTONS,
     coordinates,
     timestamps,
   })
@@ -427,6 +553,7 @@ export const createControlBox = ({
 const createAnimationControlBox = ({
   map,
   container,
+  mapContainer,
   buttons,
   coordinates,
   timestamps,
@@ -435,13 +562,95 @@ const createAnimationControlBox = ({
   const box = document.createElement('div')
   box.classList.add('animation-control-box')
 
-  // 現在位置ボックス
+  // 表示切替ボックスを作成する
+  createDispControlBox(box, mapContainer)
+
+  // 現在位置ボックスを作成する
+  createCuurrentPosBox(box, timestamps[0])
+
+  // 再生位置コントロールボックスを作成する
+  createPosControlBox(box, buttons)
+
+  // ボックスをコンテナに追加する
+  if (container.children.length) {
+    container.removeChild(container.firstChild)
+  }
+  container.appendChild(box)
+
+  // 各ボタンにイベントを設置する
+  setPosControlButtonEvents({ map, coordinates, timestamps })
+}
+
+/**
+ * 表示切替ボックスを作成する
+ */
+const createDispControlBox = (box, mapContainer) => {
+  const dispControlBox = document.createElement('div')
+  dispControlBox.classList.add('disp-control-box')
+
+  // 3Dボタン
+  const threedButton = document.createElement('div')
+  threedButton.classList.add('disp-control-button')
+  if (is3dView) {
+    threedButton.classList.add('is-active')
+  }
+  const threedButtonLabel = document.createElement('div')
+  threedButtonLabel.classList.add('disp-control-button-label')
+  threedButtonLabel.innerHTML = '3D'
+  threedButton.appendChild(threedButtonLabel)
+  dispControlBox.appendChild(threedButton)
+
+  // 3Dボタンのイベント
+  threedButton.addEventListener('click', async () => {
+    is3dView = !is3dView
+    threedButton.classList.toggle('is-active')
+    const map = await drawMap({
+      container: mapContainer.id,
+      params: {
+        center: coordinates[0],
+      },
+    })
+    await drawCoordinatePolyline({ map, coordinates, timestamps })
+    await pointDotOnMap({ map, coordinate: coordinates[0] })
+    if (photos.length) {
+      console.log(photos)
+      await drawMarkersByPhotos({ map, files: structuredClone(photos) })
+    }
+    createControlBox({
+      map,
+      container: mapContainer.parentNode,
+      mapContainer,
+      coordinates,
+      timestamps,
+    })
+  })
+
+  // ノースアップボタン
+  const northupButton = document.createElement('div')
+  northupButton.classList.add('disp-control-button', 'is-active')
+  const northupButtonLabel = document.createElement('div')
+  northupButtonLabel.classList.add('disp-control-button-label')
+  northupButtonLabel.innerHTML = '▲'
+  northupButton.appendChild(northupButtonLabel)
+  dispControlBox.appendChild(northupButton)
+
+  box.appendChild(dispControlBox)
+}
+
+/**
+ * 現在位置ボックスを作成する
+ */
+const createCuurrentPosBox = (box, timestamp) => {
   const currentPosBox = document.createElement('div')
   currentPosBox.classList.add('current-position-box')
-  currentPosBox.innerHTML = dateToString(timestamps[0])
+  currentPosBox.innerHTML = dateToString(timestamp)
   box.appendChild(currentPosBox)
+}
 
-  // 再生位置コントロールボックス
+/**
+ * 再生位置コントロールボックスを作成する
+ */
+const createPosControlBox = (box, buttons) => {
   const posControlBox = document.createElement('div')
   posControlBox.classList.add('position-control-box')
 
@@ -456,12 +665,12 @@ const createAnimationControlBox = ({
     posControlBox.appendChild(button)
   })
   box.appendChild(posControlBox)
+}
 
-  // コンテナに追加する
-  container.appendChild(box)
-
-  // 各ボタンにイベントを設置する
-
+/**
+ * 再生位置コントロールボックスの各ボタンにイベントを設置する
+ */
+const setPosControlButtonEvents = ({ map, coordinates, timestamps }) => {
   // -- 先頭に戻るボタン
   document.querySelector('.button-first').addEventListener('click', () => {
     movePlayheadTo({ map, coordinates, timestamps, index: 0 })

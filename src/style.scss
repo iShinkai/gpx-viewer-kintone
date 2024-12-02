@@ -73,6 +73,44 @@
   row-gap: 8px;
   position: relative;
 
+  /** 表示切替ボックス */
+  .disp-control-box {
+    display: flex;
+    justify-content: flex-end;
+
+    .disp-control-button {
+      background-color: whitesmoke;
+      border: 1px solid gray;
+      border-radius: 0 4px 4px 0;
+      color: dimgray;
+      cursor: pointer;
+      display: flex;
+      font-size: 1.6rem;
+      font-weight: bold;
+      justify-content: center;
+      height: 36px;
+      width: 48px;
+
+      .disp-control-button-label {
+        transform: scaleX(0.65);
+      }
+
+      &:first-of-type {
+        border-radius: 4px 0 0 4px;
+        border-right-width: 0;
+      }
+
+      &:hover {
+        background-color: gainsboro;
+      }
+      
+      &.is-active, &.is-active:hover {
+        background-color: dodgerblue;
+        color: white;
+      }
+    }
+  }
+
   /** 現在位置ボックス */
   .current-position-box {
     background-color: white;

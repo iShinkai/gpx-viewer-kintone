@@ -38,42 +38,6 @@ const GPX_VIEWER_CONTAINER = 'gpx_viewer'
 /** 地図コンテナのスペースフィールド */
 const MAP_CONTAINER = 'map_container'
 
-/** 地図パラメータ初期値 */
-const MAP_PARAMS = {
-  style: {
-    version: 8,
-    sources: {
-      osm: {
-        type: 'raster',
-        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-        tileSize: 256,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      },
-    },
-    layers: [
-      {
-        id: 'osm-layer',
-        type: 'raster',
-        source: 'osm',
-      },
-    ],
-    sky: {},
-  },
-  center: [139.6917, 35.6895],
-  zoom: 10,
-}
-
-/** 表示位置コントロールボタンの配列 */
-const POS_CONTROL_BUTTONS = [
-  { id: 'first', label: '|◀' },
-  { id: 'prev', label: '◀◀' },
-  { id: 'play', label: '▶' },
-  { id: 'stop', label: '||' },
-  { id: 'next', label: '▶▶' },
-  { id: 'last', label: '▶|' },
-]
-
 /**
  * - - - - - - - - - - - - - - - - - - - -
  * kintone イベントハンドラ
@@ -142,7 +106,7 @@ kintone.events.on('app.record.index.show', async (event) => {
         // レコードがなければ初期値で描画する
         const map = await drawMap({
           container: MAP_CONTAINER,
-          params: MAP_PARAMS,
+          params: {},
         })
       }
     }
@@ -194,32 +158,6 @@ const generateMapContent = async (record, viewerContainer, className) => {
   // 最初の地図センター
   const firstCenter = coordinates[0]
 
-  // 地図コンテナ
-  const mapContainer = (() => {
-    // 既存のコンテナがあればそれを返却する
-    const container = document.getElementById(MAP_CONTAINER)
-    if (container) return container
-
-    // なければ作成して返却する
-    const newContainer = document.createElement('div')
-    newContainer.id = MAP_CONTAINER
-    newContainer.classList.add(className)
-    viewerContainer.appendChild(newContainer)
-    return newContainer
-  })()
-
-  // 初期値で地図を準備する
-  const map = await drawMap({
-    container: mapContainer.id,
-    params: { ...MAP_PARAMS, center: firstCenter },
-  })
-
-  // GPX ファイルに基づく地点データをポリラインで地図に描画する
-  await drawCoordinatePolyline({ map, coordinates, timestamps })
-
-  // 地図の開始位置にドットを置く
-  await pointDotOnMap({ map, coordinate: firstCenter })
-
   // 写真テーブルから JGP 画像を取得する
   // テーブルの個々の行には画像は1ファイルの想定
   const photos = []
@@ -237,18 +175,44 @@ const generateMapContent = async (record, viewerContainer, className) => {
       }
     })
     console.log(photos)
+  }
 
-    // 写真をマーカーとして地図に配置する
-    if (photos.length) {
-      await drawMarkersByPhotos({ map, files: photos })
-    }
+  // 地図コンテナ
+  const mapContainer = (() => {
+    // 既存のコンテナがあればそれを返却する
+    const container = document.getElementById(MAP_CONTAINER)
+    if (container) return container
+
+    // なければ作成して返却する
+    const newContainer = document.createElement('div')
+    newContainer.id = MAP_CONTAINER
+    newContainer.classList.add(MAP_CONTAINER, className)
+    viewerContainer.appendChild(newContainer)
+    return newContainer
+  })()
+
+  // 初期値で地図を準備する
+  const map = await drawMap({
+    container: mapContainer.id,
+    params: { center: firstCenter },
+  })
+
+  // GPX ファイルに基づく地点データをポリラインで地図に描画する
+  await drawCoordinatePolyline({ map, coordinates, timestamps })
+
+  // 地図の開始位置にドットを置く
+  await pointDotOnMap({ map, coordinate: firstCenter })
+
+  // 写真をマーカーとして地図に配置する
+  if (photos.length) {
+    await drawMarkersByPhotos({ map, files: photos })
   }
 
   // コントロールボックスを作成する
   createControlBox({
     map,
     container: viewerContainer,
-    buttons: POS_CONTROL_BUTTONS,
+    mapContainer,
     coordinates,
     timestamps,
   })
