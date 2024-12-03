@@ -12,7 +12,7 @@ volta install node@22.11.0
 volta install corepack
 corepack enable
 corepack enable pnpm
-pnpm
+pnpm install
 ```
 
 次に、ローカルビルドを参照するための環境を作ります。
