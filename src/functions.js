@@ -71,7 +71,7 @@ let mouseIid = null
 let is3dView = false
 
 /** ノースアップ表示フラグ */
-let isNorthUpView = false
+const isNorthUpView = false
 
 /** 地図パラメータ初期値 */
 const defMapParams = {
@@ -150,36 +150,6 @@ const gsiTerrainParams = {
  */
 
 /**
- * 指定のクエリに基づきアプリのレコードを一括取得して返却する
- */
-export const getAppRecordsByQuery = async (query) => {
-  console.log('指定のクエリに基づきアプリのレコードを一括取得して返却する')
-  console.log(query)
-
-  // kintone REST API Client
-  const client = new KintoneRestAPIClient()
-
-  // 取得パラメータを準備する
-  const params = {
-    app: kintone.app.getId(),
-  }
-  if (query.includes('order by ')) {
-    params.condition = query.substring(0, query.indexOf('order by '))
-    params.orderBy = query.substring(query.indexOf('order by ') + 9)
-  } else {
-    params.condition = query
-  }
-  console.log(params)
-
-  // 指定のパラメータでレコードを一括取得する
-  const records = await client.record.getAllRecords(params)
-  console.log(records)
-
-  // 返却
-  return records
-}
-
-/**
  * 指定の ID を持つ要素に指定のパラメータで地図を描画する
  */
 export const drawMap = async ({ container, params }) => {
@@ -206,6 +176,8 @@ export const drawMap = async ({ container, params }) => {
     ...mapParams,
   })
   await sleep(1000)
+
+  // 返却
   return map
 }
 
@@ -256,20 +228,10 @@ export const drawCoordinatePolyline = async ({
 }
 
 /**
- * GPX ファイルを読み込む
+ * XML テキストデータを GPX データにパースする
  */
-export const readGpxFile = async (file) => {
-  console.log('GPXファイルを読み込む')
-
-  // kintone REST API Client でファイルを取得する
-  const client = new KintoneRestAPIClient()
-  const arrayBuffer = await client.file.downloadFile({
-    fileKey: file.fileKey,
-  })
-
-  // テキストをデコードする
-  const textDecoder = new TextDecoder()
-  const xmlStr = textDecoder.decode(arrayBuffer)
+export const readGpxData = (xmlStr) => {
+  console.log('XMLテキストデータをGPXデータにパースする')
 
   // パースする
   const parser = new DOMParser()
@@ -321,13 +283,13 @@ export const getTrackPoints = (doc) => {
 }
 
 /**
- * GPX ファイルを読み込み緯度経度高度情報配列と記録日時配列を得る
- * @param {*} file
- * @returns
+ * GPX データから緯度経度高度情報配列と記録日時配列を得る
  */
-export const getCoordinatesAndTimestamps = async (file) => {
-  // GPX ファイルを読み込み地点データに変換する
-  const doc = await readGpxFile(file)
+export const getCoordinatesAndTimestamps = async (xmlStr) => {
+  // XML テキストデータを GPX データにパースする
+  const doc = readGpxData(xmlStr)
+
+  // GPX データを地点データに変換する
   const trackPoints = getTrackPoints(doc)
 
   // 地点データと記録日時データの配列を初期化する
@@ -449,7 +411,7 @@ const readImageFile = async (file) => {
 
   // 各種情報をまとめて返却する
   return {
-    ...file,
+    name: file.name,
     blobUrl,
     coordinate,
     timestamp,
