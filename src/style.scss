@@ -108,6 +108,21 @@
         background-color: dodgerblue;
         color: white;
       }
+
+      &.is-heading-up {
+        .disp-control-button-label {
+          div {
+            transform: skew(-60deg, 10deg) scale(0.75);
+          }
+
+          &::before {
+            content: '◯';
+            opacity: 0.75;
+            position: absolute;
+            transform: skew(40deg, -20deg) scale(2, 0.75);
+          }
+        }
+      }
     }
   }
 

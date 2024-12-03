@@ -68,7 +68,7 @@ let mouseIid = null
 let is3dView = false
 
 /** ノースアップ表示フラグ */
-const isNorthUpView = false
+let isNorthUpView = true
 
 /** 地図パラメータ初期値 */
 const defMapParams = {
@@ -608,11 +608,20 @@ const createDispControlBox = (box, mapContainer) => {
 
   // ノースアップボタン
   const northupButton = document.createElement('div')
-  northupButton.classList.add('disp-control-button', 'is-active')
+  northupButton.classList.add(
+    'disp-control-button',
+    'is-active',
+    isNorthUpView ? 'is-north-up' : 'is-heading-up',
+  )
   const northupButtonLabel = document.createElement('div')
   northupButtonLabel.classList.add('disp-control-button-label')
-  northupButtonLabel.innerHTML = '▲'
+  northupButtonLabel.innerHTML = '<div>▲</div>'
   northupButton.appendChild(northupButtonLabel)
+  northupButton.addEventListener('click', () => {
+    northupButton.classList.toggle('is-north-up')
+    northupButton.classList.toggle('is-heading-up')
+    isNorthUpView = !isNorthUpView
+  })
   dispControlBox.appendChild(northupButton)
 
   box.appendChild(dispControlBox)
