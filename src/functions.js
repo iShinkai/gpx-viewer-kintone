@@ -18,9 +18,6 @@ import { useGsiTerrainSource } from 'maplibre-gl-gsi-terrain'
 /** EXIF.js */
 import EXIF from 'exif-js'
 
-/** kintone REST API Client */
-import { KintoneRestAPIClient } from '@kintone/rest-api-client'
-
 /** kintone UI Components */
 import { Dropdown, ReadOnlyTable } from 'kintone-ui-component'
 
@@ -148,6 +145,50 @@ const gsiTerrainParams = {
  * 関数
  * - - - - - - - - - - - - - - - - - - - -
  */
+
+/**
+ * 地図コンテンツ部を構築する
+ */
+export const constructMapContent = async ({
+  mapContainer,
+  coordinates,
+  timestamps,
+  photos,
+}) => {
+  // 初期値で地図を準備する
+  const map = await drawMap({
+    container: mapContainer.id,
+    params: {
+      center: coordinates.length ? coordinates[0] : defMapParams.center,
+    },
+  })
+
+  // GPX ファイルに基づく地点データをポリラインで地図に描画する
+  await drawCoordinatePolyline({ map, coordinates, timestamps })
+
+  // 地図の開始位置にドットを置く
+  await pointDotOnMap({
+    map,
+    coordinate: coordinates.length ? coordinates[0] : defMapParams.center,
+  })
+
+  // 写真をマーカーとして地図に配置する
+  if (photos.length) {
+    console.log(photos)
+    await drawMarkersByPhotos({ map, files: structuredClone(photos) })
+  }
+
+  // コントロールボックスを作成する
+  createControlBox({
+    map,
+    container: mapContainer.parentNode,
+    mapContainer,
+    coordinates,
+    timestamps,
+  })
+
+  return map
+}
 
 /**
  * 指定の ID を持つ要素に指定のパラメータで地図を描画する
@@ -329,12 +370,12 @@ export const drawMarkersByPhotos = async ({ map, files }) => {
   photos.push(...files)
   console.log(photos)
 
-  // 画像ファイルを読み取る
+  // 画像データを読み取る
   const images = []
-  for (const fileInfo of files) {
+  for (const file of files) {
     images.push({
-      ...(await readImageFile(fileInfo.file)),
-      comment: fileInfo.comment,
+      ...(await readImageExifData(file)),
+      comment: file.comment,
     })
   }
 
@@ -380,25 +421,19 @@ export const drawMarkersByPhotos = async ({ map, files }) => {
       .setLngLat([image.coordinate.lon, image.coordinate.lat])
       .setPopup(popup)
       .addTo(map)
+    console.log(marker)
   })
 }
 
 /**
- * 画像ファイルを読み込む
+ * 画像データから Exif データを読み込む
  */
-const readImageFile = async (file) => {
-  // kintone REST API Client でファイルを取得する
-  const client = new KintoneRestAPIClient()
-  const arrayBuffer = await client.file.downloadFile({
-    fileKey: file.fileKey,
-  })
-  const blob = new Blob([arrayBuffer])
-
+const readImageExifData = async (file) => {
   // Blob URL（表示用データURL）
-  const blobUrl = window.URL.createObjectURL(blob)
+  const blobUrl = window.URL.createObjectURL(file.blob)
 
   // File オブジェクト
-  const fileObj = new File([blob], file.name, { type: blob.type })
+  const fileObj = new File([file.blob], file.name, { type: file.blob.type })
 
   // Exif データを読み取る
   const exif = await getExifData(fileObj)
@@ -540,7 +575,9 @@ const createAnimationControlBox = ({
   container.appendChild(box)
 
   // 各ボタンにイベントを設置する
-  setPosControlButtonEvents({ map, coordinates, timestamps })
+  if (timestamps) {
+    setPosControlButtonEvents({ map, coordinates, timestamps })
+  }
 }
 
 /**
@@ -566,25 +603,7 @@ const createDispControlBox = (box, mapContainer) => {
   threedButton.addEventListener('click', async () => {
     is3dView = !is3dView
     threedButton.classList.toggle('is-active')
-    const map = await drawMap({
-      container: mapContainer.id,
-      params: {
-        center: coordinates[0],
-      },
-    })
-    await drawCoordinatePolyline({ map, coordinates, timestamps })
-    await pointDotOnMap({ map, coordinate: coordinates[0] })
-    if (photos.length) {
-      console.log(photos)
-      await drawMarkersByPhotos({ map, files: structuredClone(photos) })
-    }
-    createControlBox({
-      map,
-      container: mapContainer.parentNode,
-      mapContainer,
-      coordinates,
-      timestamps,
-    })
+    await constructMapContent({ mapContainer, coordinates, timestamps, photos })
   })
 
   // ノースアップボタン
@@ -605,7 +624,7 @@ const createDispControlBox = (box, mapContainer) => {
 const createCuurrentPosBox = (box, timestamp) => {
   const currentPosBox = document.createElement('div')
   currentPosBox.classList.add('current-position-box')
-  currentPosBox.innerHTML = dateToString(timestamp)
+  currentPosBox.innerHTML = timestamp ? dateToString(timestamp) : 'no data'
   box.appendChild(currentPosBox)
 }
 
@@ -619,7 +638,7 @@ const createPosControlBox = (box, buttons) => {
   // コントロールボタン
   buttons.forEach((b) => {
     const button = document.createElement('div')
-    button.classList.add('control-button', `button-${b.id}`)
+    button.classList.add('control-button', `button-${b.id}`, 'disabled')
     const buttonLabel = document.createElement('div')
     buttonLabel.classList.add('control-button-label')
     buttonLabel.innerHTML = b.label
@@ -697,6 +716,11 @@ const setPosControlButtonEvents = ({ map, coordinates, timestamps }) => {
       index: timestamps.length - 1,
     })
   })
+
+  // 無効クラスを外す
+  document
+    .querySelectorAll('.control-button')
+    .forEach((button) => button.classList.remove('disabled'))
 }
 
 /**
@@ -885,7 +909,9 @@ const createPointListElem = ({ map, container, coordinates, timestamps }) => {
 
   // 1行目を表示しておく
   setTimeout(() => {
-    movePlayheadTo({ map, coordinates, timestamps, index: 0 })
+    if (timestamps.length) {
+      movePlayheadTo({ map, coordinates, timestamps, index: 0 })
+    }
   }, 2000)
 }
 
@@ -912,9 +938,9 @@ const setPointListTable = ({ coordinates, timestamps }) => {
   stepElem.innerHTML = `total: ${coordinates.length} steps`
 
   // 日時の初期値を更新する
-  document.querySelector('.current-position-box').innerHTML = dateToString(
-    timestamps[0],
-  )
+  document.querySelector('.current-position-box').innerHTML = timestamps.length
+    ? dateToString(timestamps[0])
+    : 'no data'
 }
 
 /**

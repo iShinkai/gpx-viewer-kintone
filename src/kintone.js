@@ -13,9 +13,6 @@
 /** kintone REST API Client */
 import { KintoneRestAPIClient } from '@kintone/rest-api-client'
 
-/** kintone UI Components */
-import { Dropdown, ReadOnlyTable } from 'kintone-ui-component'
-
 /**
  * - - - - - - - - - - - - - - - - - - - -
  * 関数
@@ -87,4 +84,18 @@ export const loadImageFileToBlob = async (file) => {
 
   // 返却
   return blob
+}
+
+/**
+ * コメント欄（サイドバー）を非表示にする
+ */
+export const hideSideBar = () => {
+  if (location.href.includes('tab=')) {
+    location.href = location.href.replace(
+      /tab=comments|tab=history/,
+      'tab=none',
+    )
+  } else {
+    location.href = `${location.href}&tab=none`
+  }
 }

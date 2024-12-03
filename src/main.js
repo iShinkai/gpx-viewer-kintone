@@ -11,18 +11,19 @@
  */
 
 /** kintone 関連関数 */
-import { getAppRecordsByQuery, loadXmlFileToText } from './kintone'
+import {
+  getAppRecordsByQuery,
+  loadXmlFileToText,
+  loadImageFileToBlob,
+  hideSideBar,
+} from './kintone'
 
 /** 共通関数 */
 import {
   dateToString,
-  drawMap,
-  createControlBox,
+  constructMapContent,
   createDropdown,
-  drawCoordinatePolyline,
-  drawMarkersByPhotos,
   getCoordinatesAndTimestamps,
-  pointDotOnMap,
 } from './functions'
 
 /** スタイル */
@@ -117,9 +118,12 @@ kintone.events.on('app.record.index.show', async (event) => {
         createRecordSelectDropdown(records, rootContainer)
       } else {
         // レコードがなければ初期値で描画する
-        const map = await drawMap({
-          container: MAP_CONTAINER,
-          params: {},
+        await generateMapContent({
+          coordinates: [],
+          timestamps: [],
+          photos: [],
+          rootContainer,
+          className: `${MAP_CONTAINER}-index`,
         })
       }
     }
@@ -134,20 +138,6 @@ kintone.events.on('app.record.index.show', async (event) => {
  * 関数
  * - - - - - - - - - - - - - - - - - - - -
  */
-
-/**
- * コメント欄（サイドバー）を非表示にする
- */
-const hideSideBar = () => {
-  if (location.href.includes('tab=')) {
-    location.href = location.href.replace(
-      /tab=comments|tab=history/,
-      'tab=none',
-    )
-  } else {
-    location.href = `${location.href}&tab=none`
-  }
-}
 
 /**
  * 描画対象データを準備する
@@ -176,11 +166,17 @@ const prepareData = async (record) => {
         row.value['画像ファイル'].value[0].contentType === 'image/jpeg'
       ) {
         photos.push({
-          file: row.value['画像ファイル'].value[0],
+          ...row.value['画像ファイル'].value[0],
           comment: row.value['画像コメント'].value || '',
         })
       }
     })
+
+    // 画像をダウンロードして blob を確保する
+    for (const photo of photos) {
+      const blob = await loadImageFileToBlob(photo)
+      photo.blob = blob
+    }
     console.log(photos)
   }
 
@@ -204,9 +200,6 @@ const generateMapContent = async ({
   const curContorlBox = document.querySelector('.control-box')
   if (curContorlBox) curContorlBox.parentElement.removeChild(curContorlBox)
 
-  // 最初の地図センター
-  const firstCenter = coordinates[0]
-
   // 地図コンテナ
   const mapContainer = (() => {
     // 既存のコンテナがあればそれを返却する
@@ -221,31 +214,14 @@ const generateMapContent = async ({
     return newContainer
   })()
 
-  // 初期値で地図を準備する
-  const map = await drawMap({
-    container: mapContainer.id,
-    params: { center: firstCenter },
-  })
-
-  // GPX ファイルに基づく地点データをポリラインで地図に描画する
-  await drawCoordinatePolyline({ map, coordinates, timestamps })
-
-  // 地図の開始位置にドットを置く
-  await pointDotOnMap({ map, coordinate: firstCenter })
-
-  // 写真をマーカーとして地図に配置する
-  if (photos.length) {
-    await drawMarkersByPhotos({ map, files: photos })
-  }
-
-  // コントロールボックスを作成する
-  createControlBox({
-    map,
-    container: rootContainer,
+  // 地図コンテンツ部を構築する
+  const map = await constructMapContent({
     mapContainer,
     coordinates,
     timestamps,
+    photos,
   })
+  console.log(map)
 }
 
 /**
