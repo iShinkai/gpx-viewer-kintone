@@ -136,7 +136,7 @@ const gsiTerrainParams = {
   },
   center: [139.6917, 35.6895],
   zoom: 13,
-  pitch: 70,
+  pitch: 60,
   maxPitch: 85,
 }
 
@@ -381,47 +381,49 @@ export const drawMarkersByPhotos = async ({ map, files }) => {
 
   // 地図上にマーカーを配置する
   images.forEach((image) => {
-    // ポップアップの内容物
-    const popupBody = document.createElement('div')
+    if (image.coordinate) {
+      // ポップアップの内容物
+      const popupBody = document.createElement('div')
 
-    // ボディ部
-    popupBody.classList.add('popup-body')
+      // ボディ部
+      popupBody.classList.add('popup-body')
 
-    // -- 画像部
-    const img = document.createElement('img')
-    img.classList.add('popup-body-image')
-    img.src = image.blobUrl
-    popupBody.appendChild(img)
+      // -- 画像部
+      const img = document.createElement('img')
+      img.classList.add('popup-body-image')
+      img.src = image.blobUrl
+      popupBody.appendChild(img)
 
-    // -- 説明部
-    const desc = document.createElement('div')
-    desc.classList.add('popup-body-desc')
+      // -- 説明部
+      const desc = document.createElement('div')
+      desc.classList.add('popup-body-desc')
 
-    // ---- コメント
-    const comment = document.createElement('div')
-    comment.classList.add('popup-body-desc-comment')
-    comment.innerHTML = image.comment
-    desc.appendChild(comment)
+      // ---- コメント
+      const comment = document.createElement('div')
+      comment.classList.add('popup-body-desc-comment')
+      comment.innerHTML = image.comment
+      desc.appendChild(comment)
 
-    // ---- 撮影日時
-    const timestamp = document.createElement('div')
-    timestamp.classList.add('popup-body-desc-timestamp')
-    timestamp.innerHTML = image.timestamp ? dateToString(image.timestamp) : ''
-    desc.appendChild(timestamp)
+      // ---- 撮影日時
+      const timestamp = document.createElement('div')
+      timestamp.classList.add('popup-body-desc-timestamp')
+      timestamp.innerHTML = image.timestamp ? dateToString(image.timestamp) : ''
+      desc.appendChild(timestamp)
 
-    popupBody.appendChild(desc)
+      popupBody.appendChild(desc)
 
-    // ポップアップ
-    const popup = new Popup({ className: 'popup' })
-      .setMaxWidth('400px')
-      .setDOMContent(popupBody)
+      // ポップアップ
+      const popup = new Popup({ className: 'popup' })
+        .setMaxWidth('400px')
+        .setDOMContent(popupBody)
 
-    // マーカー
-    const marker = new Marker()
-      .setLngLat([image.coordinate.lon, image.coordinate.lat])
-      .setPopup(popup)
-      .addTo(map)
-    console.log(marker)
+      // マーカー
+      const marker = new Marker()
+        .setLngLat([image.coordinate.lon, image.coordinate.lat])
+        .setPopup(popup)
+        .addTo(map)
+      console.log(marker)
+    }
   })
 }
 
@@ -473,17 +475,21 @@ const getExifData = async (fileObj) => {
  * Exif データから緯度・経度・高度の情報を取得する
  */
 const exifToLatLonAlt = (exif) => {
-  return {
-    lat:
-      exif.GPSLatitude[0] +
-      exif.GPSLatitude[1] / 60 +
-      exif.GPSLatitude[2] / 3600,
-    lon:
-      exif.GPSLongitude[0] +
-      exif.GPSLongitude[1] / 60 +
-      exif.GPSLongitude[2] / 3600,
-    alt: Number(exif.GPSAltitude),
+  if (exif.GPSLatitude && exif.GPSLongitude) {
+    return {
+      lat:
+        exif.GPSLatitude[0] +
+        exif.GPSLatitude[1] / 60 +
+        exif.GPSLatitude[2] / 3600,
+      lon:
+        exif.GPSLongitude[0] +
+        exif.GPSLongitude[1] / 60 +
+        exif.GPSLongitude[2] / 3600,
+      alt: Number(exif.GPSAltitude),
+    }
   }
+
+  return null
 }
 
 /**
@@ -497,7 +503,7 @@ const exifToTimestamp = (exif) => {
     /^([0-9]+)[:/]([0-9]+)[:/]([0-9]+)[T ]([0-9]+):([0-9]+):([0-9]+)/
   const matched = dateTimeOriginal.match(new RegExp(pattern))
 
-  if (matched.length) {
+  if (matched && matched.length) {
     const dateTimeText = `${matched[1]}/${matched[2]}/${matched[3]} ${matched[4]}:${matched[5]}:${matched[6]}`
     return new Date(dateTimeText)
   }
@@ -577,10 +583,6 @@ const createAnimationControlBox = ({
   // 各ボタンにイベントを設置する
   if (timestamps && timestamps.length) {
     setPosControlButtonEvents({ map, coordinates, timestamps })
-  } else {
-    document
-      .querySelectorAll('.control-button')
-      .forEach((button) => button.classList.add('disabled'))
   }
 }
 
@@ -832,6 +834,15 @@ const animateLine = ({ map, line, coordinates, timestamps, index }) => {
 
   // センターをセットする
   movePlayheadTo({ map, coordinates, timestamps, index })
+
+  // ヘディングアップの場合は地図を回転する
+  if (!isNorthUpView && index + 1 < coordinates.length) {
+    const degree = getDegreeBy2Coordinates(
+      coordinates[index],
+      coordinates[index + 1],
+    )
+    map.rotateTo(degree)
+  }
 
   // GeoJSONソースを更新する
   map.getSource('line').setData(line)
@@ -1096,6 +1107,39 @@ export const dateToString = (date, format = 'datetime') => {
   }
   return `${dateToString(date, 'date')} ${dateToString(date, 'time')}`
 }
+
+/**
+ * 2点の座標から角度を得る
+ */
+export const getDegreeBy2Coordinates = (coordinate1, coordinate2) => {
+  // それぞれの緯度経度をラジアンに変換する
+  const lat1 = toRadians(coordinate1[1])
+  const lon1 = toRadians(coordinate1[0])
+  const lat2 = toRadians(coordinate2[1])
+  const lon2 = toRadians(coordinate2[0])
+
+  // 経度差
+  const dLon = lon2 - lon1
+
+  // 球面三角法に基づき計算する
+  const y = Math.sin(dLon) * Math.cos(lat2)
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+  const degree = (toDegrees(Math.atan2(y, x)) + 360) % 360
+
+  return degree
+}
+
+/**
+ * 角度をラジアンに変換する
+ */
+const toRadians = (degrees) => (degrees * Math.PI) / 180
+
+/**
+ * ラジアンを角度に変換する
+ */
+const toDegrees = (radians) => (radians * 180) / Math.PI
 
 /**
  * 指定ミリ秒スリープする
