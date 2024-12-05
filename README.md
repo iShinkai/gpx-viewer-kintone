@@ -2,6 +2,9 @@
 
 kintone の添付ファイルフィールドに追加した gpx ファイルを読み込み MapLibre で描画するカスタマイズです。
 
+Qiita の記事は以下を参照してください。
+[kintone × MapLibre で旅の想い出を可視化する](https://qiita.com/iShinkai/items/f20edc14c5689df8e0cd)
+
 ## インストールとセットアップ
 
 volta と corepack、pnpm を使用しています。
@@ -87,6 +90,20 @@ pnpm build
 ```
 
 `dist/production/` 以下に作成された `bundle.js` ファイルを kintone アプリに適用してください。
+
+## アプリテンプレートについて
+
+`app-template/GPX_Viewer.zip` ファイルは kintone に適用できるアプリテンプレートです。
+リリースビルド済みのカスタマイズファイルが適用済みですので、このテンプレートからアプリを作成すればすぐに利用できます。
+お手持ちの GPX ファイルや写真画像ファイルをレコードに追加して試してみてください。
+
+## スタンドアロン版
+
+kintone でなく Web サーバ等でホストできるスタンドアロン版もあります。
+データ取得部分以外の機能は kintone のものと同じです。
+
+[GPX Viewe スタンドアロン版（リポジトリ）](https://github.com/iShinkai/gpx-viewer-standalone)
+[GPX Viewe スタンドアロン版（GitHub Pages）](https://ishinkai.github.io/gpx-viewer-standalone/dist/)
 
 ## ライセンス
 
