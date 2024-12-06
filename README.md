@@ -1,4 +1,4 @@
-# gpx-viewer
+# gpx-viewer-kintone / GPV Viewer kintone 版
 
 kintone の添付ファイルフィールドに追加した gpx ファイルを読み込み MapLibre で描画するカスタマイズです。
 
