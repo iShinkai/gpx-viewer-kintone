@@ -95,6 +95,12 @@ kintone.events.on('app.record.index.show', async (event) => {
     // 地図マウントルートコンテナ要素
     const rootContainer = document.getElementById(GPX_VIEWER_CONTAINER)
     if (rootContainer) {
+      // ルートコンテナにクラスを付けておく
+      rootContainer.classList.add(`${GPX_VIEWER_CONTAINER}-index`)
+
+      // ローダーを差し込む
+      showHideLoader(rootContainer, true)
+
       // 現在のクエリでレコードを取得する
       const records = await getAppRecordsByQuery(kintone.app.getQuery())
 
@@ -126,6 +132,9 @@ kintone.events.on('app.record.index.show', async (event) => {
           className: `${MAP_CONTAINER}-index`,
         })
       }
+
+      // ローダーを落とす
+      showHideLoader(rootContainer, false)
     }
   }
 
@@ -254,6 +263,9 @@ const createRecordSelectDropdown = (records, container) => {
     // 地図マウントルートコンテナ要素
     const rootContainer = document.getElementById(GPX_VIEWER_CONTAINER)
     if (selectedRecord && rootContainer) {
+      // ローダーを差し込む
+      showHideLoader(rootContainer, true)
+
       // 描画対象データを準備する
       const { coordinates, timestamps, photos } =
         await prepareData(selectedRecord)
@@ -266,6 +278,25 @@ const createRecordSelectDropdown = (records, container) => {
         rootContainer,
         className: `${MAP_CONTAINER}-index`,
       })
+
+      // ローダーを落とす
+      showHideLoader(rootContainer, false)
     }
   })
+}
+
+/**
+ * ローダーを表示・非表示する
+ */
+const showHideLoader = (rootContainer, isLoading) => {
+  if (isLoading) {
+    const loader = document.createElement('div')
+    loader.classList.add('loader')
+    rootContainer.appendChild(loader)
+  } else {
+    const loader = rootContainer.querySelector('.loader')
+    if (loader) {
+      rootContainer.removeChild(loader)
+    }
+  }
 }

@@ -6,12 +6,16 @@
 
 /** 親コンテナ（カスタマイズビュー） */
 .gpx_viewer {
+  align-items: center;
+  display: flex;
+  justify-content: center;
   position: relative;
 }
 
 /** 地図コンテナ（カスタマイズビュー） */
 .map_container-index {
   height: calc(100vh - 282px);
+  width: 100%;
 }
 
 /** 地図コンテナ（レコード詳細画面） */
@@ -304,4 +308,25 @@
   top: 24px;
   width: 600px;
   z-index: 1;
+}
+
+/** ローダー */
+.loader {
+  animation-duration: 1s;
+  animation-iteration-count: infinite;
+  animation-name: spin;
+  animation-timing-function: ease-in-out;
+  border: solid 8px;
+  border-color: #666666 #66666610 #66666610;
+  border-radius: 50%;
+  height: 40px;
+  position: absolute;
+  height: 40px;
+  width: 40px;
+  z-index: 20;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
