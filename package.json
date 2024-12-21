@@ -7,7 +7,7 @@
   "scripts": {
     "devel": "vite build --mode development",
     "build": "vite build --mode production",
-    "watch": "vite build --mode development --watch"
+    "watch": "vite build --mode development --watch --sourcemap true"
   },
   "keywords": [],
   "author": "",
